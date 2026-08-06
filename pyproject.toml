@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pinpoint-flaky"
+version = "0.1.0"
+description = "Flaky test detective: finds flaky tests, isolates why they are flaky, and proposes verified fixes."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+pinpoint = "pinpoint.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: end-to-end tests that run many pytest subprocesses (slow)",
+]
