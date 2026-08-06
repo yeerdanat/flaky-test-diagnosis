@@ -82,10 +82,10 @@ class PytestRunner:
         self.budget = budget
         self.timeout = timeout
         self.pytest_args = pytest_args
-        # Make the pinpoint package importable inside the trial subprocess.
-        import pinpoint
+        # Make the culpa package importable inside the trial subprocess.
+        import culpa
 
-        self._pkg_dir = str(Path(pinpoint.__file__).resolve().parent.parent)
+        self._pkg_dir = str(Path(culpa.__file__).resolve().parent.parent)
 
     # ------------------------------------------------------------------ #
 
@@ -95,7 +95,7 @@ class PytestRunner:
         # hash-order flakes actually surface. Trials pin it explicitly.
         env.pop("PYTHONHASHSEED", None)
         for k in list(env):
-            if k.startswith("PINPOINT_"):
+            if k.startswith("CULPA_"):
                 del env[k]
         env["PYTHONPATH"] = os.pathsep.join(
             p for p in (self._pkg_dir, env.get("PYTHONPATH")) if p
@@ -136,20 +136,20 @@ class PytestRunner:
     ) -> TrialResult:
         """Run exactly `tests`, in order, in a fresh process. One trial."""
         start = time.monotonic()
-        with tempfile.TemporaryDirectory(prefix="pinpoint-trial-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="culpa-trial-") as tmp:
             out_file = os.path.join(tmp, "results.jsonl")
             order_file = os.path.join(tmp, "order.json")
             with open(order_file, "w") as f:
                 json.dump(tests, f)
 
             env = self._base_env()
-            env["PINPOINT_OUT"] = out_file
-            env["PINPOINT_ORDER"] = order_file
-            env["PINPOINT_ROOT"] = str(self.repo)
+            env["CULPA_OUT"] = out_file
+            env["CULPA_ORDER"] = order_file
+            env["CULPA_ROOT"] = str(self.repo)
             if statediff:
-                env["PINPOINT_STATEDIFF"] = "1"
+                env["CULPA_STATEDIFF"] = "1"
             if rng_seed is not None:
-                env["PINPOINT_RNG_SEED"] = str(rng_seed)
+                env["CULPA_RNG_SEED"] = str(rng_seed)
             if env_overrides:
                 env.update(env_overrides)
 
@@ -158,7 +158,7 @@ class PytestRunner:
             cmd = [
                 sys.executable, "-m", "pytest", "-q",
                 "--rootdir", str(self.repo),
-                "-p", "pinpoint.plugin",
+                "-p", "culpa.plugin",
                 "-p", "no:cacheprovider",
                 "-p", "no:randomly",
                 "--continue-on-collection-errors",

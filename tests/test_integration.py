@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from pinpoint.cli import main
+from culpa.cli import main
 
 EXAMPLE = Path(__file__).parent.parent / "examples" / "flaky_suite"
 

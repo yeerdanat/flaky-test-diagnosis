@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from pinpoint.stats import (
+from culpa.stats import (
     ACCEPT_H0,
     ACCEPT_H1,
     CONTINUE,

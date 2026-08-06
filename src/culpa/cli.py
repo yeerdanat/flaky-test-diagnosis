@@ -1,6 +1,6 @@
-"""Pinpoint CLI.
+"""Culpa CLI.
 
-    pinpoint scan [path] [--rounds N] [--budget N] [--fix] [--verify] [--json PATH]
+    culpa scan [path] [--rounds N] [--budget N] [--fix] [--verify] [--json PATH]
 """
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ from .report import render_text, write_json, write_patches
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="pinpoint",
+        prog="culpa",
         description="Flaky test detective: find flaky tests, isolate why, "
                     "propose verified fixes.",
     )
-    parser.add_argument("--version", action="version", version=f"pinpoint {__version__}")
+    parser.add_argument("--version", action="version", version=f"culpa {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     scan = sub.add_parser("scan", help="scan a pytest suite for flaky tests")
@@ -42,9 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
                       help="verify each patch: statistical replay + regression "
                            "+ semantic check (implies --fix)")
     scan.add_argument("--json", metavar="PATH", default=None,
-                      help="JSON report path (default: <path>/.pinpoint/report.json)")
+                      help="JSON report path (default: <path>/.culpa/report.json)")
     scan.add_argument("--db", metavar="PATH", default=None,
-                      help="SQLite history path (default: <path>/.pinpoint/pinpoint.db)")
+                      help="SQLite history path (default: <path>/.culpa/culpa.db)")
     scan.add_argument("--fail-on-flake", action="store_true",
                       help="exit 1 if any flaky test is found (CI mode)")
     scan.add_argument("-q", "--quiet", action="store_true",
@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         orchestrator.store.close()
 
-    json_path = Path(args.json) if args.json else repo / ".pinpoint" / "report.json"
+    json_path = Path(args.json) if args.json else repo / ".culpa" / "report.json"
     write_json(report, json_path)
     patch_paths = write_patches(report, json_path.parent / "patches")
 

@@ -1,4 +1,4 @@
-"""Pinpoint — flaky test detective.
+"""Culpa — flaky test detective.
 
 Finds flaky tests, isolates *why* they are flaky by perturbing one
 environmental dimension at a time, and proposes verified fixes.

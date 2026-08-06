@@ -43,6 +43,20 @@ class ScreenResult:
         return self.control_failures / self.control_trials if self.control_trials else 0.0
 
 
+# Seeds for the "vary" conditions are spread across the seed space rather than
+# taken consecutively: a short run of adjacent seeds is a small, arbitrary slice
+# that can badly misrepresent a dimension's true failure rate, and because the
+# sequence is fixed it would misrepresent it the *same way on every run*. The
+# stride is a large prime, so the sequence stays deterministic and reproducible
+# while covering the space evenly.
+_SEED_STRIDE = 104729
+_SEED_MAX = 2**32 - 1
+
+
+def _spread_seed(i: int) -> int:
+    return (1 + i * _SEED_STRIDE) % _SEED_MAX
+
+
 def _run_condition(
     runner: PytestRunner,
     test_id: str,
@@ -53,8 +67,9 @@ def _run_condition(
     failures = 0
     trials = 0
     for i in range(n):
-        env = {"PYTHONHASHSEED": hashseed if hashseed is not None else str(1000 + i)}
-        seed = rng_seed if rng_seed is not None else 1000 + i
+        varied = _spread_seed(i)
+        env = {"PYTHONHASHSEED": hashseed if hashseed is not None else str(varied)}
+        seed = rng_seed if rng_seed is not None else varied
         trial = runner.run([test_id], env_overrides=env, rng_seed=seed)
         result = trial.outcome_of(test_id)
         if result is None or result.failed:

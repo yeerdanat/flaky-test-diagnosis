@@ -5,4 +5,4 @@ Passes under PYTHONHASHSEED=0, ~50% of other seeds fail.
 
 
 def test_string_hash_parity_assumption():
-    assert hash("pinpoint") % 2 == 1
+    assert hash("culpa") % 2 == 1

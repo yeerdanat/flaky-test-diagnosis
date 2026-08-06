@@ -1,24 +1,26 @@
-# Pinpoint — Flaky Test Detective
+# Flaky Test Diagnosis
 
-**Finds flaky tests, isolates *why* they're flaky, and proposes verified fixes.**
+**Finds flaky tests, works out why they're flaky, and proposes fixes it has verified.**
 
 ## The problem
 
-A flaky test passes sometimes and fails other times on identical code — it isn't
-detecting a real bug, it's reacting to hidden nondeterminism. Existing tooling
-(CI retry plugins, `pytest-rerunfailures`) tells you **which** test is flaky.
-Pinpoint tells you **why**: flakiness has a small number of identifiable causes,
-and each one can be isolated by perturbing exactly one environmental variable
-and watching whether the failure rate moves.
+A flaky test passes on some runs and fails on others with the same code. The
+failure comes from hidden nondeterminism in the environment, so the code under
+test is usually fine.
+
+CI retry plugins and `pytest-rerunfailures` tell you which test is flaky. This
+tool tells you why. Flakiness has a small number of identifiable causes, and
+each one can be isolated by changing exactly one environmental variable and
+watching whether the failure rate moves.
 
 ## Quickstart
 
 ```bash
 pip install -e .
-pinpoint scan path/to/repo --verify
+culpa scan path/to/repo --verify
 ```
 
-Sample diagnosis (from `examples/flaky_suite`):
+Sample diagnosis, from `examples/flaky_suite`:
 
 ```
 ● test_invoice.py::test_default_currency_is_usd
@@ -33,98 +35,75 @@ Sample diagnosis (from `examples/flaky_suite`):
   verification: VERIFIED (replay 0/9 failures, regression ok, semantic ok)
 ```
 
-Not *"test_billing pollutes test_invoice"* — but *"test_billing leaves
-`app.state.CURRENCY` set to `'EUR'`"*. A diagnosis someone can act on in
-thirty seconds.
+The report names the polluted state, so the diagnosis reads as "test_billing
+leaves `app.state.CURRENCY` set to `'EUR'`". That is actionable in thirty
+seconds.
 
 ## How it works
 
-Debugging is reframed as a controlled experiment:
+Debugging is run as a controlled experiment.
 
-1. **Detection rounds** — the suite runs several times in shuffled orders
+1. **Detection rounds.** The suite runs several times in shuffled orders
    (iDFlakies-style) so order-dependent failures actually surface.
-2. **Isolation baseline** — every suspect runs alone in a fresh process.
-   Passes alone consistently → *victim* of test-order pollution. Mixed alone →
-   *non-order-dependent* (seed/time/thread). Fails alone → brittle or broken.
-   Without this baseline, order dependence and ambient nondeterminism are
-   confounded and every later conclusion is wrong.
-3. **Bisection** (order-dependent path) — probabilistic delta debugging finds
-   the minimal polluting prefix, then state-diff instrumentation names exactly
-   what was polluted (module globals, `os.environ`, cwd, RNG state, …).
-4. **Screening** (non-order-dependent path) — one dimension is perturbed at a
-   time (`PYTHONHASHSEED`, RNG seed) while everything else is pinned; a
+2. **Isolation baseline.** Every suspect runs alone in a fresh process.
+   Consistent passes mean a *victim* of test-order pollution, mixed results mean
+   *non-order-dependent* flakiness (seed, time, thread), and consistent failures
+   mean a brittle or broken test. Without this baseline, order dependence and
+   ambient nondeterminism are confounded and every later conclusion is wrong.
+3. **Bisection**, on the order-dependent path. Probabilistic delta debugging
+   finds the minimal polluting prefix. State-diff instrumentation then names
+   what was polluted: module globals, `os.environ`, cwd, RNG state, and so on.
+4. **Screening**, on the non-order-dependent path. One dimension is perturbed
+   at a time (`PYTHONHASHSEED`, RNG seed) while everything else is pinned. A
    two-proportion test decides whether the failure rate moved, with
-   Benjamini–Hochberg FDR control across all screened hypotheses.
-5. **Fix synthesis + verification** — risk-tiered patches (emitted as `.diff`
-   for human review, never auto-applied), each verified three ways:
-   statistical replay of the exact original failing condition, a full-suite
-   regression check, and a semantic guard proving the patch didn't weaken any
-   test (no assertions deleted, no skip/xfail added).
+   Benjamini-Hochberg FDR control across all screened hypotheses.
+5. **Fix synthesis and verification.** Patches are risk-tiered and emitted as
+   `.diff` files for human review. Each one is verified three ways: statistical
+   replay of the exact original failing condition, a full-suite regression
+   check, and a semantic guard proving the patch didn't weaken any test (no
+   assertions deleted, no skip or xfail added).
 
 ## The algorithm: ddmin under a noisy oracle
 
-Standard delta debugging assumes a deterministic oracle; a flaky-test oracle
-is probabilistic — a prefix that genuinely triggers the bug may still pass on
-a given trial. Pinpoint adapts ddmin by making every oracle query a
+Standard delta debugging assumes a deterministic oracle. A flaky-test oracle is
+probabilistic, so a prefix that genuinely triggers the bug can still pass on any
+given trial. The bisector handles this by making every oracle query a
 **sequential probability ratio test** with **asymmetric error thresholds**:
 
-- A false *"this subset doesn't trigger it"* prunes away the true polluter and
-  the whole bisection goes wrong → discarding a subset requires strong
-  evidence (β = 0.02, ≈6 consecutive clean passes).
-- A false *"triggers"* only costs extra trials → accepting is cheap
-  (α = 0.10, one observed failure usually suffices).
+- If a query wrongly reports that a subset does *not* trigger the failure, the
+  real polluter gets pruned away and the rest of the bisection is wrong.
+  Discarding a subset therefore requires strong evidence (β = 0.02, about six
+  consecutive clean passes).
+- If a query wrongly reports that a subset *does* trigger it, the only cost is
+  extra trials. Accepting is therefore cheap (α = 0.10, one observed failure is
+  usually enough).
 
-SPRT is used everywhere a fixed-N design would be wasteful or wrong: detection,
-bisection oracle queries, and fix replay. Failure rates are reported as Wilson
-score intervals, never raw fractions.
+SPRT is used everywhere a fixed-N design would be wasteful or misleading:
+detection, bisection oracle queries, and fix replay. Failure rates are reported
+as Wilson score intervals, because 1/5 and 20/100 are both "20%" with very
+different confidence.
 
 ## Cost control
 
 - Oracle queries run `[subset..., victim]`, never the whole suite.
 - Oracle results are cached per ordered subset.
-- Fresh process per trial is the default (process reuse *causes* the leakage
-  being measured).
-- `--budget N` caps total trials; on exhaustion Pinpoint reports the smallest
-  *confirmed* polluting prefix rather than nothing.
-- Cost is reported honestly: trials run, wall-clock spent.
+- Fresh process per trial is the default. Reusing a process introduces the
+  state leakage that is being measured.
+- `--budget N` caps total trials. On exhaustion it still reports the smallest
+  *confirmed* polluting prefix.
+- Cost is reported honestly: trials run and wall-clock spent.
 
 ## CLI
 
 ```
-pinpoint scan [path]
+culpa scan [path]
     --rounds N          detection rounds (default 6; round 0 = collection order)
     --budget N          max total trials, partial results on exhaustion (default 400)
     --screen-trials N   trials per perturbation condition (default 12)
     --fix               synthesize candidate patches (.diff files)
     --verify            verify patches (replay + regression + semantic), implies --fix
-    --json PATH         machine-readable report (default <path>/.pinpoint/report.json)
+    --json PATH         machine-readable report (default <path>/.culpa/report.json)
     --fail-on-flake     exit 1 if flakes found (CI mode)
 ```
 
-Run history is stored in SQLite (`.pinpoint/pinpoint.db`).
-
-## Limitations (v1)
-
-- Python/pytest only; the runner adapter is the single framework-specific component.
-- Two perturbation dimensions: test ordering and hash/RNG seed. Clock skew,
-  thread scheduling, and network isolation are v2.
-- Genuine concurrency bugs can be *identified* (unattributed nondeterminism)
-  but not root-caused — the interleaving can't be forced from outside the runtime.
-- Interacting multi-cause flakes get flagged as jointly implicated rather than
-  resolved (single-factor screening finds main effects only).
-- Never auto-commits; patches are proposals for human review.
-
-## Design decisions
-
-- **No LLM in the core loop.** Detection, bisection, and verification are
-  entirely algorithmic and reproducible.
-- **The semantic guard exists before it's needed** — the trivially "correct"
-  fix for any flaky test is deleting its assertions, and a tool that can do
-  that silently is dangerous.
-- **Patches are applied in a disposable copy of the repo**, never the live tree.
-
-## Roadmap
-
-Clock/timezone skew, thread-scheduling jitter, network isolation ·
-parallel trial execution · HTML report · brittle/cleaner detection ·
-MCP server wrapper · Jest adapter.
+Run history is stored in SQLite, at `.culpa/culpa.db`.

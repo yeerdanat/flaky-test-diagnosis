@@ -9,7 +9,7 @@ v1 covers the two v1 flake categories:
   PYTHONHASHSEED (balanced; the conservative alternative — set the env var in
   CI — is stated in the description)
 
-Patches are emitted as unified diffs for human review. Pinpoint never
+Patches are emitted as unified diffs for human review. Culpa never
 commits and never mutates the working tree unless --apply (not in v1).
 """
 from __future__ import annotations
@@ -73,35 +73,35 @@ def fix_for_od(
         return None  # nothing concrete to restore; don't emit a guess
 
     lines = [
-        "# --- added by pinpoint: restore state polluted by "
+        "# --- added by culpa: restore state polluted by "
         + ", ".join(polluters) + " ---",
-        "import os as _pinpoint_os",
-        "import pytest as _pinpoint_pytest",
+        "import os as _culpa_os",
+        "import pytest as _culpa_pytest",
         "",
         "",
-        "@_pinpoint_pytest.fixture(autouse=True)",
-        "def _pinpoint_restore_polluted_state():",
+        "@_culpa_pytest.fixture(autouse=True)",
+        "def _culpa_restore_polluted_state():",
     ]
     body = []
     if env_keys:
         keys = sorted(env_keys)
-        body.append(f"    _saved_env = {{k: _pinpoint_os.environ.get(k) for k in {keys!r}}}")
+        body.append(f"    _saved_env = {{k: _culpa_os.environ.get(k) for k in {keys!r}}}")
     for i, (mod, attrs) in enumerate(sorted(module_attrs.items())):
-        body.append(f"    import {mod} as _pinpoint_mod{i}")
+        body.append(f"    import {mod} as _culpa_mod{i}")
         for attr in sorted(attrs):
-            body.append(f"    _saved_{i}_{attr} = getattr(_pinpoint_mod{i}, {attr!r}, None)")
+            body.append(f"    _saved_{i}_{attr} = getattr(_culpa_mod{i}, {attr!r}, None)")
     body.append("    yield")
     if env_keys:
         body += [
             "    for k, v in _saved_env.items():",
             "        if v is None:",
-            "            _pinpoint_os.environ.pop(k, None)",
+            "            _culpa_os.environ.pop(k, None)",
             "        else:",
-            "            _pinpoint_os.environ[k] = v",
+            "            _culpa_os.environ[k] = v",
         ]
     for i, (mod, attrs) in enumerate(sorted(module_attrs.items())):
         for attr in sorted(attrs):
-            body.append(f"    setattr(_pinpoint_mod{i}, {attr!r}, _saved_{i}_{attr})")
+            body.append(f"    setattr(_culpa_mod{i}, {attr!r}, _saved_{i}_{attr})")
     block = "\n".join(lines + body) + "\n"
 
     old = _read_conftest(repo)
@@ -127,12 +127,12 @@ def fix_for_od(
 def fix_for_rngseed(repo: Path) -> Patch:
     """Conservative: seed the RNG in an autouse fixture."""
     block = (
-        "# --- added by pinpoint: pin RNG seed (unseeded-randomness flake) ---\n"
-        "import pytest as _pinpoint_pytest\n"
+        "# --- added by culpa: pin RNG seed (unseeded-randomness flake) ---\n"
+        "import pytest as _culpa_pytest\n"
         "\n"
         "\n"
-        "@_pinpoint_pytest.fixture(autouse=True)\n"
-        "def _pinpoint_seed_rng():\n"
+        "@_culpa_pytest.fixture(autouse=True)\n"
+        "def _culpa_seed_rng():\n"
         "    import random\n"
         "    random.seed(0)\n"
         "    try:\n"
@@ -158,17 +158,17 @@ def fix_for_rngseed(repo: Path) -> Patch:
 def fix_for_hashseed(repo: Path) -> Patch:
     """Pin PYTHONHASHSEED by re-exec at conftest import time."""
     block = (
-        "# --- added by pinpoint: pin PYTHONHASHSEED (hash-order flake) ---\n"
+        "# --- added by culpa: pin PYTHONHASHSEED (hash-order flake) ---\n"
         "# The hash seed must be fixed before interpreter start, so if it is\n"
         "# unset we re-exec the test process once with it pinned.\n"
-        "import os as _pinpoint_os\n"
-        "import sys as _pinpoint_sys\n"
+        "import os as _culpa_os\n"
+        "import sys as _culpa_sys\n"
         "\n"
-        "if _pinpoint_os.environ.get(\"PYTHONHASHSEED\") is None:\n"
-        "    _pinpoint_os.environ[\"PYTHONHASHSEED\"] = \"0\"\n"
-        "    _pinpoint_os.execv(\n"
-        "        _pinpoint_sys.executable,\n"
-        "        [_pinpoint_sys.executable] + _pinpoint_sys.argv,\n"
+        "if _culpa_os.environ.get(\"PYTHONHASHSEED\") is None:\n"
+        "    _culpa_os.environ[\"PYTHONHASHSEED\"] = \"0\"\n"
+        "    _culpa_os.execv(\n"
+        "        _culpa_sys.executable,\n"
+        "        [_culpa_sys.executable] + _culpa_sys.argv,\n"
         "    )\n"
     )
     old = _read_conftest(repo)

@@ -66,7 +66,7 @@ class Orchestrator:
 
         self.budget = Budget(max_trials=max_trials)
         self.runner = PytestRunner(self.repo, budget=self.budget, pytest_args=pytest_args)
-        self.store = Store(db_path or self.repo / ".pinpoint" / "pinpoint.db")
+        self.store = Store(db_path or self.repo / ".culpa" / "culpa.db")
 
     # ------------------------------------------------------------------ #
 
@@ -159,7 +159,7 @@ class Orchestrator:
         self.store.finish_run(run_id, "exhausted" if exhausted else "completed")
 
         report = {
-            "pinpoint_version": __version__,
+            "culpa_version": __version__,
             "repo": str(self.repo),
             "started_at": datetime.datetime.fromtimestamp(
                 started, datetime.timezone.utc).isoformat(),

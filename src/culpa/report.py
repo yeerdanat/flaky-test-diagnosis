@@ -40,7 +40,7 @@ def render_text(report: dict) -> str:
     lines: list[str] = []
     add = lines.append
     cost = report["cost"]
-    add(f"pinpoint {report['pinpoint_version']} — scan of {report['repo']}")
+    add(f"culpa {report['culpa_version']} — scan of {report['repo']}")
     add(f"suite: {report['suite']['tests']} tests, {report['suite']['rounds']} rounds")
     add(f"cost: {cost['trials']} trials, {cost['wall_seconds']}s wall"
         f" (budget {cost['budget_trials']}"

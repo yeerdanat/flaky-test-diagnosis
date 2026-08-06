@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pinpoint-flaky"
+name = "culpa"
 version = "0.1.0"
 description = "Flaky test detective: finds flaky tests, isolates why they are flaky, and proposes verified fixes."
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pinpoint = "pinpoint.cli:main"
+culpa = "culpa.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
