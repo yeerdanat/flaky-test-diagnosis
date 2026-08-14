@@ -17,7 +17,7 @@ watching whether the failure rate moves.
 
 ```bash
 pip install -e .
-culpa scan path/to/repo --verify
+whyflaky scan path/to/repo --verify
 ```
 
 Sample diagnosis, from `examples/flaky_suite`:
@@ -29,6 +29,8 @@ Sample diagnosis, from `examples/flaky_suite`:
   alone:    failed 0/24 (0%), CI [0%, 14%] -> stable_pass
   cause: test-order dependence (state pollution)
   polluter(s): test_billing.py::test_eur_invoice_formatting (confidence: high, 2 oracle queries, 3 trials)
+    polluted state: os.environ['APP_CURRENCY']
+    polluted state: app.state.CURRENCY
     test_billing.py::test_eur_invoice_formatting: os.environ['APP_CURRENCY']: None -> 'EUR'
     test_billing.py::test_eur_invoice_formatting: app.state.CURRENCY: 'USD' -> 'EUR'
   proposed fix (balanced tier): Autouse fixture in conftest.py saves/restores ...
@@ -93,17 +95,60 @@ different confidence.
   *confirmed* polluting prefix.
 - Cost is reported honestly: trials run and wall-clock spent.
 
+## Benchmarks
+
+Measured on 75 generated pytest suites (15 scenario types, 5 generation
+seeds) with known injected flakes: order-dependent polluters of module
+globals, environment variables, and cwd; hash-seed and unseeded-RNG flakes
+at designed failure rates of 20 to 60 percent; an always-failing control and
+a fully stable control. Ground truth is recorded at generation time, so every
+diagnosis is scored against what was actually injected.
+
+| metric | result |
+|---|---|
+| Detection precision | 100% (55 flakes reported, 0 false positives) |
+| Detection recall | 92% (55/60; all 5 misses are 20 to 40 percent flakes that never failed in 6 detection rounds) |
+| Kind classification (OD / NOD / broken) | 98% (59/60) |
+| Cause classification | 97% (58/60) |
+| Polluter localization, rank-1 | 100% (35/35 order-dependent cases) |
+| Proposed fixes passing 3-stage verification | 86% (37/43) |
+| Total cost | 2825 trials, 386 s wall |
+
+Trial cost against a fixed-repetition baseline (50 reruns per query,
+pytest-flakefinder's default), same scenarios, same conclusions required:
+
+| suite | SPRT trials | fixed-50 trials | saving |
+|---|---|---|---|
+| 10-test OD scenario | 36 | 282 | 7.8x |
+| 30-test OD scenario | 37 to 42 | 332 | 8.0 to 9.0x |
+| 80-test OD scenario | 39 | 432 | 11.1x |
+| all 15 scenarios | 527 | 2591 | 4.9x |
+
+The two arms reached identical conclusions on 14 of 15 scenarios. The
+exception is a 20-percent-rate flake that surfaced in one arm's detection
+rounds and not the other's; at that rate a 6-round scan has roughly a 74%
+chance of surfacing the flake at all, which is a detection-round limit, and
+`--rounds` raises it.
+
+Hardware for wall-clock numbers: Apple M3 Pro, Python 3.13. Trial counts are
+hardware-independent. Reproduce with:
+
+```
+python -m benchmark.run --seed 1
+python -m benchmark.run --baseline --fixed-n 50
+```
+
 ## CLI
 
 ```
-culpa scan [path]
+whyflaky scan [path]
     --rounds N          detection rounds (default 6; round 0 = collection order)
     --budget N          max total trials, partial results on exhaustion (default 400)
     --screen-trials N   trials per perturbation condition (default 12)
     --fix               synthesize candidate patches (.diff files)
     --verify            verify patches (replay + regression + semantic), implies --fix
-    --json PATH         machine-readable report (default <path>/.culpa/report.json)
+    --json PATH         machine-readable report (default <path>/.whyflaky/report.json)
     --fail-on-flake     exit 1 if flakes found (CI mode)
 ```
 
-Run history is stored in SQLite, at `.culpa/culpa.db`.
+Run history is stored in SQLite, at `.whyflaky/whyflaky.db`.
