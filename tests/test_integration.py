@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from culpa.cli import main
+from whyflaky.cli import main
 
 EXAMPLE = Path(__file__).parent.parent / "examples" / "flaky_suite"
 

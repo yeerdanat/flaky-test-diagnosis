@@ -2,7 +2,7 @@ __pycache__/
 *.pyc
 *.egg-info/
 .venv/
-.culpa/
+.whyflaky/
 .pytest_cache/
 dist/
 build/

@@ -82,10 +82,10 @@ class PytestRunner:
         self.budget = budget
         self.timeout = timeout
         self.pytest_args = pytest_args
-        # Make the culpa package importable inside the trial subprocess.
-        import culpa
+        # Make the whyflaky package importable inside the trial subprocess.
+        import whyflaky
 
-        self._pkg_dir = str(Path(culpa.__file__).resolve().parent.parent)
+        self._pkg_dir = str(Path(whyflaky.__file__).resolve().parent.parent)
 
     # ------------------------------------------------------------------ #
 
@@ -95,7 +95,7 @@ class PytestRunner:
         # hash-order flakes actually surface. Trials pin it explicitly.
         env.pop("PYTHONHASHSEED", None)
         for k in list(env):
-            if k.startswith("CULPA_"):
+            if k.startswith("WHYFLAKY_"):
                 del env[k]
         env["PYTHONPATH"] = os.pathsep.join(
             p for p in (self._pkg_dir, env.get("PYTHONPATH")) if p
@@ -136,20 +136,20 @@ class PytestRunner:
     ) -> TrialResult:
         """Run exactly `tests`, in order, in a fresh process. One trial."""
         start = time.monotonic()
-        with tempfile.TemporaryDirectory(prefix="culpa-trial-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="whyflaky-trial-") as tmp:
             out_file = os.path.join(tmp, "results.jsonl")
             order_file = os.path.join(tmp, "order.json")
             with open(order_file, "w") as f:
                 json.dump(tests, f)
 
             env = self._base_env()
-            env["CULPA_OUT"] = out_file
-            env["CULPA_ORDER"] = order_file
-            env["CULPA_ROOT"] = str(self.repo)
+            env["WHYFLAKY_OUT"] = out_file
+            env["WHYFLAKY_ORDER"] = order_file
+            env["WHYFLAKY_ROOT"] = str(self.repo)
             if statediff:
-                env["CULPA_STATEDIFF"] = "1"
+                env["WHYFLAKY_STATEDIFF"] = "1"
             if rng_seed is not None:
-                env["CULPA_RNG_SEED"] = str(rng_seed)
+                env["WHYFLAKY_RNG_SEED"] = str(rng_seed)
             if env_overrides:
                 env.update(env_overrides)
 
@@ -158,7 +158,7 @@ class PytestRunner:
             cmd = [
                 sys.executable, "-m", "pytest", "-q",
                 "--rootdir", str(self.repo),
-                "-p", "culpa.plugin",
+                "-p", "whyflaky.plugin",
                 "-p", "no:cacheprovider",
                 "-p", "no:randomly",
                 "--continue-on-collection-errors",

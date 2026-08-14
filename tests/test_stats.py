@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from culpa.stats import (
+from whyflaky.stats import (
     ACCEPT_H0,
     ACCEPT_H1,
     CONTINUE,

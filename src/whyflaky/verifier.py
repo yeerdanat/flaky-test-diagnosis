@@ -105,12 +105,12 @@ def verify_patch(
         result.note = "semantic check failed; skipped replay and regression"
         return result
 
-    workdir = Path(tempfile.mkdtemp(prefix="culpa-verify-"))
+    workdir = Path(tempfile.mkdtemp(prefix="whyflaky-verify-"))
     try:
         repo_copy = workdir / "repo"
         shutil.copytree(
             repo, repo_copy,
-            ignore=shutil.ignore_patterns("__pycache__", ".git", ".culpa",
+            ignore=shutil.ignore_patterns("__pycache__", ".git", ".whyflaky",
                                           "*.pyc", ".venv", "venv"),
         )
         _apply_patch(repo_copy, patch)

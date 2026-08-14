@@ -5,7 +5,7 @@ inputs always generate byte-identical suites, so published benchmark numbers
 are reproducible from the scenario id alone.
 
 Ground-truth vocabulary (manifest `kind` / `cause`) is deliberately abstract;
-the scorer in commit 2 maps culpa's report strings onto it:
+the scorer in commit 2 maps whyflaky's report strings onto it:
 
     kind:  od_victim | nod | always_failing
     cause: order_pollution | hashseed | rngseed | broken

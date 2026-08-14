@@ -1,15 +1,15 @@
 """Unit tests for error normalization, fix synthesis, and the semantic guard."""
 from pathlib import Path
 
-from culpa.fixes import (
+from whyflaky.fixes import (
     TIER_BALANCED,
     TIER_CONSERVATIVE,
     fix_for_hashseed,
     fix_for_od,
     fix_for_rngseed,
 )
-from culpa.plugin import error_hash, normalize_error
-from culpa.verifier import _test_weakening
+from whyflaky.plugin import error_hash, normalize_error
+from whyflaky.verifier import _test_weakening
 
 
 class TestErrorNormalization:

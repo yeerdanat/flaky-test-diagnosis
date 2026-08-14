@@ -2,9 +2,9 @@
 subprocesses, so the ddmin adaptations are testable in milliseconds."""
 import random
 
-from culpa.bisector import _chunks, bisect
-from culpa.runner import Budget, BudgetExhausted, TrialResult
-from culpa.runner import TestResult as _Result  # alias avoids pytest collection
+from whyflaky.bisector import _chunks, bisect
+from whyflaky.runner import Budget, BudgetExhausted, TrialResult
+from whyflaky.runner import TestResult as _Result  # alias avoids pytest collection
 
 
 class FakeRunner:

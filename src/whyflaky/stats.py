@@ -7,6 +7,7 @@ dependencies. Wilson + SPRT is deliberately the ceiling of sophistication
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass, field
 
 # SPRT decisions
@@ -43,6 +44,13 @@ class SPRT:
     The caller sets alpha/beta *asymmetrically* where the error costs are
     asymmetric (the bisector: a false "doesn't trigger" prunes the true
     polluter and wrecks the whole bisection, so beta is tiny there).
+
+    Benchmark-only escape hatch: when WHYFLAKY_FIXED_N is set in the
+    environment (a positive integer), sequential stopping is disabled and
+    every query runs exactly that many trials, deciding by the same midpoint
+    rule as the hard cap. This exists so the benchmark can measure SPRT's
+    trial savings against a fixed-repetition baseline (pytest-flakefinder
+    style); it is not a user-facing feature.
     """
 
     p0: float = 0.01
@@ -60,6 +68,12 @@ class SPRT:
         self._lower = math.log(self.beta / (1 - self.alpha))
         self._inc_fail = math.log(self.p1 / self.p0)
         self._inc_pass = math.log((1 - self.p1) / (1 - self.p0))
+        fixed = os.environ.get("WHYFLAKY_FIXED_N")
+        self._fixed_n = int(fixed) if fixed and fixed.isdigit() else None
+
+    def _decide_by_rate(self) -> str:
+        rate = self.failures / self.n
+        return ACCEPT_H1 if rate >= (self.p0 + self.p1) / 2 else ACCEPT_H0
 
     def record(self, failed: bool) -> str:
         """Record one trial outcome; return CONTINUE / ACCEPT_H0 / ACCEPT_H1."""
@@ -69,14 +83,16 @@ class SPRT:
             self.llr += self._inc_fail
         else:
             self.llr += self._inc_pass
+        if self._fixed_n:
+            # benchmark baseline mode: no sequential stopping
+            return self._decide_by_rate() if self.n >= self._fixed_n else CONTINUE
         if self.llr >= self._upper:
             return ACCEPT_H1
         if self.llr <= self._lower:
             return ACCEPT_H0
         if self.n >= self.max_trials:
             # Hard cap: decide by maximum likelihood (midpoint rule).
-            rate = self.failures / self.n
-            return ACCEPT_H1 if rate >= (self.p0 + self.p1) / 2 else ACCEPT_H0
+            return self._decide_by_rate()
         return CONTINUE
 
     @property

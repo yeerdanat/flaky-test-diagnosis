@@ -1,15 +1,15 @@
-"""Pytest plugin that Culpa's runner injects into every trial subprocess.
+"""Pytest plugin that WhyFlaky's runner injects into every trial subprocess.
 
-Loaded explicitly with ``-p culpa.plugin`` and activated only when
-``CULPA_OUT`` is set, so it is inert in any other pytest invocation.
+Loaded explicitly with ``-p whyflaky.plugin`` and activated only when
+``WHYFLAKY_OUT`` is set, so it is inert in any other pytest invocation.
 
 Responsibilities (driven entirely by environment variables):
 
-- ``CULPA_OUT``       — path of the JSONL results file to append to (activation flag)
-- ``CULPA_ORDER``     — path of a JSON list of node ids; run exactly these, in this order
-- ``CULPA_RNG_SEED``  — seed ``random`` (and numpy if present) at session start
-- ``CULPA_STATEDIFF`` — "1" to snapshot/diff process state around every test
-- ``CULPA_ROOT``      — repo root; module-global snapshots are limited to modules under it
+- ``WHYFLAKY_OUT``       — path of the JSONL results file to append to (activation flag)
+- ``WHYFLAKY_ORDER``     — path of a JSON list of node ids; run exactly these, in this order
+- ``WHYFLAKY_RNG_SEED``  — seed ``random`` (and numpy if present) at session start
+- ``WHYFLAKY_STATEDIFF`` — "1" to snapshot/diff process state around every test
+- ``WHYFLAKY_ROOT``      — repo root; module-global snapshots are limited to modules under it
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ import warnings
 
 import pytest
 
-_ENV_IGNORE_PREFIXES = ("CULPA_", "PYTEST_")
+_ENV_IGNORE_PREFIXES = ("WHYFLAKY_", "PYTEST_")
 _REPR_LIMIT = 300
 _SIMPLE_TYPES = (int, float, str, bool, bytes, type(None))
 _CONTAINER_TYPES = (list, dict, set, tuple, frozenset)
@@ -32,7 +32,7 @@ _outcomes: dict[str, dict] = {}
 
 
 def _active() -> bool:
-    return bool(os.environ.get("CULPA_OUT"))
+    return bool(os.environ.get("WHYFLAKY_OUT"))
 
 
 # --------------------------------------------------------------------------- #
@@ -76,7 +76,7 @@ def _bounded_repr(value) -> str | None:
 
 
 def _snapshot() -> dict:
-    root = os.environ.get("CULPA_ROOT", "")
+    root = os.environ.get("WHYFLAKY_ROOT", "")
     env = {
         k: v
         for k, v in os.environ.items()
@@ -158,7 +158,7 @@ def _diff_snapshots(before: dict, after: dict) -> dict:
 def pytest_configure(config):
     if not _active():
         return
-    seed = os.environ.get("CULPA_RNG_SEED")
+    seed = os.environ.get("WHYFLAKY_RNG_SEED")
     if seed is not None:
         import random
 
@@ -174,7 +174,7 @@ def pytest_configure(config):
 def pytest_collection_modifyitems(config, items):
     if not _active():
         return
-    order_file = os.environ.get("CULPA_ORDER")
+    order_file = os.environ.get("WHYFLAKY_ORDER")
     if not order_file:
         return
     with open(order_file) as f:
@@ -207,7 +207,7 @@ def pytest_runtest_protocol(item, nextitem):
     if not _active():
         yield
         return
-    statediff = os.environ.get("CULPA_STATEDIFF") == "1"
+    statediff = os.environ.get("WHYFLAKY_STATEDIFF") == "1"
     before = _snapshot() if statediff else None
     yield
     state_diff = _diff_snapshots(before, _snapshot()) if statediff else None
@@ -220,5 +220,5 @@ def pytest_runtest_protocol(item, nextitem):
         "error": rec["error"][:2000] if rec["error"] else None,
         "state_diff": state_diff or None,
     }
-    with open(os.environ["CULPA_OUT"], "a") as f:
+    with open(os.environ["WHYFLAKY_OUT"], "a") as f:
         f.write(json.dumps(line) + "\n")

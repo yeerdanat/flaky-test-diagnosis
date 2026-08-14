@@ -1,4 +1,4 @@
-"""Score culpa reports against scenario ground truth.
+"""Score whyflaky reports against scenario ground truth.
 
 Metric definitions (matching the design doc's validation section):
 
@@ -32,7 +32,7 @@ from .scenarios import (
     KIND_OD_VICTIM,
 )
 
-# report vocabulary (src/culpa/orchestrator.py)
+# report vocabulary (src/whyflaky/orchestrator.py)
 _REPORT_KIND = {
     KIND_OD_VICTIM: "order-dependent (victim)",
     KIND_NOD: "non-order-dependent",
@@ -162,6 +162,71 @@ def aggregate(scores: list[ScenarioScore]) -> dict:
             "budget_exhausted": sum(s.budget_exhausted for s in scores),
         },
     }
+
+
+def _conclusions(s: ScenarioScore) -> tuple:
+    """The scenario's diagnostic conclusions, stripped of cost: what was
+    detected and how it was explained. Two arms 'agree' when these match."""
+    return (
+        tuple(sorted((f.test_id, f.detected, f.kind_correct, f.cause_correct,
+                      f.localized) for f in s.flakes)),
+        tuple(s.false_positives),
+    )
+
+
+def compare_baseline(sprt: list[ScenarioScore],
+                     fixed: list[ScenarioScore]) -> dict:
+    """Per-scenario trial cost of SPRT vs fixed-N, plus conclusion agreement.
+
+    Only scenarios where both arms completed are compared; rows with a scan
+    error in either arm are listed separately rather than silently dropped.
+    """
+    by_id = {s.scenario_id: s for s in fixed}
+    rows, skipped = [], []
+    for a in sprt:
+        b = by_id.get(a.scenario_id)
+        if b is None or a.error or b.error:
+            skipped.append(a.scenario_id)
+            continue
+        rows.append({
+            "scenario_id": a.scenario_id,
+            "sprt_trials": a.trials,
+            "fixed_trials": b.trials,
+            "ratio": round(b.trials / a.trials, 2) if a.trials else None,
+            "agree": _conclusions(a) == _conclusions(b),
+        })
+    total_sprt = sum(r["sprt_trials"] for r in rows)
+    total_fixed = sum(r["fixed_trials"] for r in rows)
+    return {
+        "rows": rows,
+        "skipped": skipped,
+        "total_sprt_trials": total_sprt,
+        "total_fixed_trials": total_fixed,
+        "overall_ratio": round(total_fixed / total_sprt, 2) if total_sprt else None,
+        "agreement": (sum(r["agree"] for r in rows) / len(rows)) if rows else None,
+    }
+
+
+def baseline_table(cmp: dict, fixed_n: int) -> str:
+    lines = [
+        f"| scenario | SPRT trials | fixed-N={fixed_n} trials | ratio | conclusions agree |",
+        "|---|---|---|---|---|",
+    ]
+    for r in cmp["rows"]:
+        lines.append(
+            f"| {r['scenario_id']} | {r['sprt_trials']} | {r['fixed_trials']} |"
+            f" {r['ratio']}x | {'yes' if r['agree'] else 'NO'} |"
+        )
+    for sid in cmp["skipped"]:
+        lines.append(f"| {sid} | skipped (scan error) | | | |")
+    lines += [
+        "",
+        f"**SPRT vs fixed-N={fixed_n}**: {cmp['total_sprt_trials']} vs"
+        f" {cmp['total_fixed_trials']} trials"
+        f" ({cmp['overall_ratio']}x saving), conclusions agree on"
+        f" {_fmt(cmp['agreement'])} of scenarios",
+    ]
+    return "\n".join(lines)
 
 
 def _fmt(x: float | None) -> str:
